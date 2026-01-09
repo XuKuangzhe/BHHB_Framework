@@ -1,0 +1,99 @@
+================================================================================
+DATA DICTIONARY / CODEBOOK
+Dataset: sumGDT.csv
+Project: Decoupling Decision and Intensity in Social Perception
+Author: Kuangzhe Xu
+================================================================================
+
+Total Variables: 25
+Total Observations: 4,200 (Example size from snippet)
+Missing Data: None (Rows with missing validity or tracking data were removed during preprocessing)
+
+--------------------------------------------------------------------------------
+1. EXPERIMENTAL METADATA
+--------------------------------------------------------------------------------
+participant         [Character]
+    Unique identifier for each participant (e.g., "Subj1").
+    Anonymized for privacy.
+
+expName             [Character]
+    Identifier for the experimental session/condition.
+    - "S8" : Experiment 1 (8-second duration condition, or specific setting 1)
+    - "S12": Experiment 2 (12-second duration condition, or specific setting 2)
+    *Note: "inferEx..." in raw data corresponds to the PsychoPy experiment name.
+
+picname             [Character]
+    Filename of the stimulus image presented (e.g., "AgrM1.jpg").
+    Contains embedded information about the impression category (e.g., "Agr" = Agreeableness) 
+    and model characteristics.
+
+--------------------------------------------------------------------------------
+2. BEHAVIORAL RESPONSES (Explicit)
+--------------------------------------------------------------------------------
+key_resp_2.keys     [Numeric]
+    Explicit Impression Rating.
+    Range: 1 (Low) to 7 (High).
+    The participant's subjective evaluation of the face on the target trait.
+
+key_resp_confi.keys [Numeric]
+    Confidence Rating.
+    Range: 1 (Low Confidence) to 7 (High Confidence).
+    Self-reported confidence in the impression rating provided above.
+
+--------------------------------------------------------------------------------
+3. PARTICIPANT DEMOGRAPHICS & TRAITS
+--------------------------------------------------------------------------------
+age                 [Numeric]
+    Participant's age in years.
+
+gender              [Character]
+    Participant's gender (e.g., "Male", "Female").
+
+Big Five Personality Traits (Self-Reported):
+Scores derived from the short-form Big Five inventory.
+    Ext             [Numeric]: Extraversion score.
+    Agr             [Numeric]: Agreeableness score.
+    Con             [Numeric]: Conscientiousness score.
+    Neu             [Numeric]: Neuroticism score.
+    Ope             [Numeric]: Openness to Experience score.
+
+--------------------------------------------------------------------------------
+4. DATA QUALITY METRICS
+--------------------------------------------------------------------------------
+Valp                [Numeric]
+    Validity Percentage / Data Quality Score.
+    Range: 0.0 to 1.0.
+    Represents the proportion of valid gaze samples captured by the eye tracker 
+    during the trial duration. 
+    *Trials with Valp < 0.6 are typically excluded from analysis.*
+
+--------------------------------------------------------------------------------
+5. GAZE TRACKING METRICS (Implicit)
+--------------------------------------------------------------------------------
+Weighted density scores calculated from Gaussian-smoothed fixation heatmaps 
+for specific Areas of Interest (AOIs).
+Values represent the relative attention intensity on each facial feature.
+
+GazeGL              [Numeric]: Glabella (Area between eyebrows)
+GazeFH              [Numeric]: Forehead
+GazeEB              [Numeric]: Eyebrows (Left + Right)
+GazeEY              [Numeric]: Eyes (Left + Right)
+GazeNO              [Numeric]: Nose
+GazeMO              [Numeric]: Mouth
+
+--------------------------------------------------------------------------------
+6. MOUSE TRACKING METRICS (Implicit)
+--------------------------------------------------------------------------------
+Weighted density scores calculated from Gaussian-smoothed mouse cursor heatmaps.
+Analogous to Gaze metrics but reflecting manual exploration behavior.
+
+MouseGL             [Numeric]: Glabella
+MouseFH             [Numeric]: Forehead
+MouseEB             [Numeric]: Eyebrows
+MouseEY             [Numeric]: Eyes
+MouseNO             [Numeric]: Nose
+MouseMO             [Numeric]: Mouth
+
+================================================================================
+END OF CODEBOOK
+================================================================================
