@@ -83,7 +83,7 @@ print(">>> Running Section 03: Parameter Recovery...")
 sim_results_df <- run_grad_sim_calc(
   stan_model_obj = ZIBmodvef, 
   target_props = c(0.10, 0.30, 0.60),
-  iter = 1000
+  iter = 2000
 )
 
 # Plot Results
@@ -188,7 +188,7 @@ sens_data <- run_sensitivity_calc(
   stan_model_obj = model_sens, 
   exp_list = c("S8", "S12"),
   aoi_list = c("GazeGL", "GazeFH", "GazeEB", "GazeEY", "GazeNO", "GazeMO"),
-  iter = 1000
+  iter = 2000
 )
 
 # write_csv(sens_data, file.path(path_out, "Full_Sensitivity_With_Diagnostics.csv"))
