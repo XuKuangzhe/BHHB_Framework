@@ -88,7 +88,7 @@ generate_zib_gradient <- function(N_subj=40, N_pic=20, target_zero_prop = 0.5) {
 #' @param stan_model_obj Compiled Stan model object
 run_grad_sim_calc <- function(stan_model_obj, 
                               target_props = c(0.10, 0.30, 0.60),
-                              iter = 1000, chains = 2, cores = 2, seed = 1234) {
+                              iter = 2000, chains = 4, seed = 1234) {
   
   results_list <- list()
   print(">>> Starting Gradient Simulation Check...")
@@ -101,7 +101,7 @@ run_grad_sim_calc <- function(stan_model_obj,
     
     # 2. Fit Model
     fit <- sampling(stan_model_obj, data = sim$dat, 
-                    seed = seed, chains = chains, cores = cores, iter = iter, refresh = 0)
+                    seed = seed, chains = chains, iter = iter, refresh = 0)
     
     # 3. Extract Results
     post <- rstan::extract(fit)
@@ -494,7 +494,7 @@ plot_ppc_compare <- function(ppc_data, plot_xlim = c(-0.05, 0.08), n_draws = 200
 #' Calculate Performance Metrics for All Models
 run_performance_calc <- function(dataset, models_list, exp_list = c("S8", "S12"),
                                  aoi_list = c("GazeGL", "GazeFH", "GazeEB", "GazeEY", "GazeNO", "GazeMO"),
-                                 seed = 1234, iter = 1000) {
+                                 seed = 1234, iter = 2000) {
   
   comparison_results <- tibble()
   imp_list <- unique(dataset$infID)
@@ -588,7 +588,7 @@ plot_crps_trend <- function(results_df) {
 # ==============================================================================
 
 #' Run Sensitivity Analysis (Original vs Diffuse Priors)
-run_sensitivity_calc <- function(dataset, stan_model_obj, exp_list, aoi_list, seed = 1234, iter = 1000) {
+run_sensitivity_calc <- function(dataset, stan_model_obj, exp_list, aoi_list, seed = 1234, iter = 2000) {
   
   sens_results <- tibble()
   imp_list <- unique(dataset$infID)
