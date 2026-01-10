@@ -36,7 +36,7 @@ To ensure exact reproducibility, please ensure you have the following key softwa
 
 ### System Requirements
 * **R**: Version 4.x.x (Tested on 4.5.1)
-* **RTools (Windows) / Xcode (macOS)**: Required for compiling Stan models.
+* **Xcode (macOS)**: Required for compiling Stan models.
 
 ### Key R Dependencies
 The analysis relies heavily on the `rstan` ecosystem and the `tidyverse`. Below are the specific versions used in the manuscript generation:
