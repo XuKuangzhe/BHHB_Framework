@@ -36,6 +36,7 @@ To ensure exact reproducibility, please ensure you have the following key softwa
 
 ### System Requirements
 * **R**: Version 4.x.x (Tested on 4.5.1)
+* **Rstudio** Version 025.09.0+387 (2025.09.0+387)
 * **Xcode (macOS)**: Required for compiling Stan models.
 
 ### Key R Dependencies
