@@ -120,13 +120,15 @@ res_s12 <- run_empirical_zib_calc(
 # Single Plot Example (S8)
 p_4area_s8 <- plot_four_area_single(res_s8$params)
 print(p_4area_s8)
+p_4area_s12 <- plot_four_area_single(res_s12$params)
+print(p_4area_s12)
 
 # Combined Plot (If you have the wrapper for both, otherwise plot individually)
 p_4area_combined <- plot_four_area_sum(res_s8$params, res_s12$params) 
 print(p_4area_combined)
 
 # Save
-ggsave(file.path(path_out, "Fig4_Four_Area_Plot.png"), p_4area_combined, width = 12, height = 7)
+#ggsave(file.path(path_out, "Fig4_Four_Area_Plot.png"), p_4area_combined, width = 10)
 
 
 # ==============================================================================
@@ -146,7 +148,7 @@ ppc_data <- run_ppc_calc(
 )
 
 # Plot
-p_ppc <- plot_ppc_compare(ppc_data)
+p_ppc <- plot_ppc_compare(ppc_data,base_font_size = 16)
 print(p_ppc)
 
 # ggsave(file.path(path_out, "Fig3_PPC_Method_Breakdown.png"), p_ppc, width = 12, height = 8)
@@ -209,7 +211,7 @@ print(">>> Running Section 08: Diagnostics...")
 res_cat <- run_zib_analysis(
   dataset = sumGDTs,
   stan_model_obj = ZIBmodvef,
-  exp_str = "S8",
+  exp_str = "S12",
   condition_col = "infID", condition_val = "Ext",
   target_y_pair = c("GazeMO", "MouseMO"), 
   predictors = NULL # NULL triggers comparison mode
@@ -222,9 +224,9 @@ print(plot_zib_forest(res_cat))
 res_reg <- run_zib_analysis(
   dataset = sumGDTs,
   stan_model_obj = ZIBmodvef,
-  exp_str = "S8",
+  exp_str = "S12",
   condition_col = "infID", condition_val = "Ext",
-  target_y = "GazeMO",
+  target_y = "GazeFH",
   predictors = c("Ext", "Agr", "Con", "Neu", "Ope") # Regression mode
 )
 
