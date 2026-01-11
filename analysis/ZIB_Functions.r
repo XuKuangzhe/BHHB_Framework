@@ -4,7 +4,7 @@
 #          empirical fitting, posterior predictive checks (PPC), model comparison 
 #          (CRPS/RMSE/MAE), and prior sensitivity analysis.
 # Author: Kuangzhe Xu
-# Date: 2026-01-09
+# Date: 2026-01-11
 # ==============================================================================
 
 # ==============================================================================
@@ -108,7 +108,7 @@ run_grad_sim_calc <- function(stan_model_obj,
     
     # Helper to format stats
     get_sum <- function(vec) {
-      st <- get_mcmc_stats(vec)
+      st <- summary_MCMC(vec)
       list(mean = st["mean"], lower = st["HDI_low"], upper = st["HDI_high"])
     }
     
@@ -246,7 +246,7 @@ run_empirical_zib_calc <- function(dataset, exp_label, stan_model_obj,
         
         for(i in 1:2) { # Bern vs Beta
           for(n in 1:2) { # Intercept vs Slope
-            b_summary <- get_mcmc_stats(dft$bz[,i,n]) 
+            b_summary <- summary_MCMC(dft$bz[,i,n]) 
             
             tb <- tibble(
               Exp = exp_label, GazeP = current_aoi, Impf = current_imp, 
@@ -297,7 +297,7 @@ plot_four_area_single <- function(data_file) {
     geom_hline(yintercept = 0, linetype = "dashed", alpha = 0.5) +
     geom_errorbarh(aes(xmin = `HDI_low_Bernoulli(Choice)`, xmax = `HDI_high_Bernoulli(Choice)`), height = 0, alpha = 0.3, color = "gray60") +
     geom_errorbar(aes(ymin = `HDI_low_Beta(Weight)`, ymax = `HDI_high_Beta(Weight)`), width = 0, alpha = 0.3, color = "gray60") +
-    geom_point(aes(color = sig_bern, shape = sig_beta), size = 4, alpha = 0.8) +
+    geom_point(aes(color = sig_bern, shape = sig_beta), size = 5) +
     geom_text_repel(aes(label = paste(GazeP, Impf)), size = 3, max.overlaps = 20, box.padding = 0.3) +
     labs(
       title = "Decoupling Decision and Intensity: The 4-Area Plot",
@@ -306,10 +306,10 @@ plot_four_area_single <- function(data_file) {
       y = "Intensity Slope (Beta Log-Odds)",
       color = "Decision Effect\n(Significant?)",
       shape = "Intensity Effect\n(Significant?)"
-    ) +
+    ) + 
     scale_color_manual(values = c("FALSE" = "#95a5a6", "TRUE" = "#e74c3c")) + 
     scale_shape_manual(values = c("FALSE" = 1, "TRUE" = 19)) +
-    theme_bw(base_size = 14) + theme(legend.position = "right")
+    theme_bw(base_size = 15) + theme(legend.position = "right")
 }
 
 #' Plot Combined 4-Area Plot for Two Experiments
@@ -384,7 +384,7 @@ plot_four_area_sum <- function(data_s8, data_s12) {
     
     # E. Text labels (with auto-repulsion to avoid overlap)
     geom_text_repel(aes(label = paste(GazeP, Impf)), 
-                    size = 2.5, max.overlaps = 20, box.padding = 0.3) +
+                    size = 3, max.overlaps = 20, box.padding = 0.3) +
     
     # F. Faceting by Experiment
     facet_wrap(~Exp_Label) +
@@ -458,32 +458,45 @@ run_ppc_calc <- function(dataset, exp_str, imp_str, aoi_str, mouse_str, models_l
 }
 
 #' Plot PPC Comparison
-plot_ppc_compare <- function(ppc_data, plot_xlim = c(-0.05, 0.08), n_draws = 200) {
+plot_ppc_compare <- function(ppc_data, plot_xlim = c(-0.05, 0.08), n_draws = 200, base_font_size = 16) {
   
   Y_vec <- ppc_data$obs
   y_rep <- ppc_data$y_rep
   meta <- ppc_data$meta
   samp_idx <- sample(nrow(y_rep$zib), min(n_draws, nrow(y_rep$zib)))
   
+  common_theme <- theme_bw(base_size = base_font_size) + 
+    theme(
+      plot.title = element_text(face = "bold", size = base_font_size),
+      plot.subtitle = element_text(size = base_font_size * 0.85),
+      legend.position = "none"
+    )
+  
   # Density Plots
   p_lmm <- ppc_dens_overlay(Y_vec, y_rep$lmm[samp_idx, ]) + coord_cartesian(xlim = plot_xlim) + 
-    labs(title = "A. LMM (Gaussian)", subtitle = "Failure: Leakage into negative values") + theme_bw() + theme(legend.position = "none")
+    labs(title = "A. LMM (Gaussian)", subtitle = "Failure: Leakage into negative values") + common_theme
   
   p_beta <- ppc_dens_overlay(Y_vec, y_rep$beta[samp_idx, ]) + coord_cartesian(xlim = plot_xlim) + 
-    labs(title = "B. Beta (Transformed)", subtitle = "Failure: Cannot produce true zeros") + theme_bw() + theme(legend.position = "none")
+    labs(title = "B. Beta (Transformed)", subtitle = "Failure: Cannot produce true zeros") + common_theme
   
   p_zib <- ppc_dens_overlay(Y_vec, y_rep$zib[samp_idx, ]) + coord_cartesian(xlim = plot_xlim) + 
-    labs(title = "C. ZIB Model", subtitle = "Success: Captures bimodal structure") + theme_bw() + theme(legend.position = c(0.8, 0.7))
+    labs(title = "C. ZIB Model", subtitle = "Success: Captures bimodal structure") + common_theme + 
+    theme(legend.position = c(0.8, 0.7))
   
   # Zero Stats
-  p_stat_lmm <- ppc_stat(Y_vec, y_rep$lmm, stat = function(y) mean(y <= 0)) + labs(title = "D. LMM Zero/Neg Pred", x = "Proportion <= 0") + theme_bw()
-  p_stat_beta <- ppc_stat(Y_vec, y_rep$beta, stat = function(y) mean(y == 0)) + labs(title = "E. Beta Zero Pred", x = "Proportion == 0") + theme_bw()
-  p_stat_zib <- ppc_stat(Y_vec, y_rep$zib, stat = function(y) mean(y == 0)) + labs(title = "F. ZIB Zero Pred", x = "Proportion == 0") + theme_bw()
+  p_stat_lmm <- ppc_stat(Y_vec, y_rep$lmm, stat = function(y) mean(y <= 0)) + 
+    labs(title = "D. LMM Zero/Neg Pred", x = "Proportion <= 0") + common_theme
+  
+  p_stat_beta <- ppc_stat(Y_vec, y_rep$beta, stat = function(y) mean(y == 0)) + 
+    labs(title = "E. Beta Zero Pred", x = "Proportion == 0") + common_theme
+  
+  p_stat_zib <- ppc_stat(Y_vec, y_rep$zib, stat = function(y) mean(y == 0)) + 
+    labs(title = "F. ZIB Zero Pred", x = "Proportion == 0") + common_theme
   
   (p_lmm + p_beta + p_zib) / (p_stat_lmm + p_stat_beta + p_stat_zib) +
     plot_annotation(
       title = paste0("Methodological Breakdown: '", meta$aoi, "' (", round(meta$zero_prop*100, 1), "% Zeros)"),
-      theme = theme(plot.title = element_text(face = "bold", size = 16))
+      theme = theme(plot.title = element_text(face = "bold", size = base_font_size * 1.2))
     )
 }
 
@@ -699,8 +712,8 @@ run_zib_analysis <- function(dataset, stan_model_obj,
   res_list <- list()
   for(i in 1:length(pred_names)) {
     p_name <- pred_names[i]
-    s_bern <- get_mcmc_stats(post$bz[, 1, i])
-    s_beta <- get_mcmc_stats(post$bz[, 2, i])
+    s_bern <- summary_MCMC(post$bz[, 1, i])
+    s_beta <- summary_MCMC(post$bz[, 2, i])
     
     res_list[[length(res_list)+1]] <- tibble(Process="Decision", Predictor=p_name, Mean=s_bern["mean"], Lower=s_bern["HDI_low"], Upper=s_bern["HDI_high"])
     res_list[[length(res_list)+1]] <- tibble(Process="Intensity", Predictor=p_name, Mean=s_beta["mean"], Lower=s_beta["HDI_low"], Upper=s_beta["HDI_high"])
@@ -710,7 +723,7 @@ run_zib_analysis <- function(dataset, stan_model_obj,
   return(list(fit = fit, results = res_df, mode = mode, meta = list(predictors = pred_names)))
 }
 
-plot_zib_diagnostics <- function(analysis_obj) {
+plot_zib_diagnostics <- function(analysis_obj,trace_pars=c("bz[1,2]", "bz[2,2]", "phi")) {
   fit <- analysis_obj$fit
   fit_sum <- rstan::summary(fit)$summary
   rhats <- fit_sum[, "Rhat"]; neff <- fit_sum[, "n_eff"] / (fit@sim$iter * fit@sim$chains / 2)
@@ -723,7 +736,7 @@ plot_zib_diagnostics <- function(analysis_obj) {
   p_neff <- mcmc_neff(neff[kept]) + labs(title = "B. Sampling Efficiency") + theme_bw()
   
   # Traceplots for first 2 predictors
-  trace_pars <- c("bz[1,2]", "bz[2,2]", "phi")
+  trace_pars <-trace_pars
   p_trace <- mcmc_trace(fit, pars = trace_pars[trace_pars %in% names(fit)], facet_args = list(ncol = 1)) + labs(title = "C. Traceplots") + theme_bw()
   
   (p_rhat / p_neff) | p_trace
