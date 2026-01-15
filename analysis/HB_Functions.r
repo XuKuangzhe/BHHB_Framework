@@ -1,16 +1,16 @@
 # ==============================================================================
-# Project: Zero-Inflated Beta (ZIB) Model for Eye-Tracking Data
+# Project: Hurdle Beta (HB) Model for Eye-Tracking Data
 # Purpose: Comprehensive analysis pipeline including parameter recovery simulation, 
 #          empirical fitting, posterior predictive checks (PPC), model comparison 
 #          (CRPS/RMSE/MAE), and prior sensitivity analysis.
 # Author: Kuangzhe Xu
-# Date: 2026-01-11
+# Date: 2026-01-09
 # ==============================================================================
 
 # ==============================================================================
 # 00. Dependencies & Helper Functions
 # ==============================================================================
-required_packages <- c("tidyverse", "rstan", "bayesplot", "patchwork", "ggrepel", "scoringRules")
+required_packages <- c("tidyverse", "rstan", "bayesplot", "patchwork", "ggrepel", "scoringRules","glmmTMB")
 new_packages <- required_packages[!(required_packages %in% installed.packages()[,"Package"])]
 if(length(new_packages)) install.packages(new_packages)
 
@@ -21,17 +21,19 @@ suppressPackageStartupMessages({
   library(patchwork)
   library(ggrepel)
   library(scoringRules)
+  library(glmmTMB)
+  library(boot)
 })
 
 # ==============================================================================
 # 01. Parameter Recovery Simulation
 # ==============================================================================
 
-#' Generate Synthetic Data for ZIB Gradient Check
+#' Generate Synthetic Data for HB Gradient Check
 #' @param N_subj Number of subjects
 #' @param N_pic Number of items/pictures
 #' @param target_zero_prop Target proportion of zeros to simulate sparsity levels
-generate_zib_gradient <- function(N_subj=40, N_pic=20, target_zero_prop = 0.5) {
+generate_hb_gradient <- function(N_subj=40, N_pic=40, target_zero_prop = 0.5) {
   
   # 1. Inverse Logit to find base intercept for target zero proportion
   base_intercept <- qlogis(1 - target_zero_prop)
@@ -95,7 +97,7 @@ run_grad_sim_calc <- function(stan_model_obj,
   
   for(tp in target_props) {
     # 1. Generate Data
-    sim <- generate_zib_gradient(target_zero_prop = tp)
+    sim <- generate_hb_gradient(target_zero_prop = tp)
     scenario_label <- sim$scenario
     print(paste("Running Scenario:", scenario_label))
     
@@ -141,33 +143,33 @@ plot_grad_sim <- function(recovery_data) {
   ggplot(recovery_data, aes(x = True_Value, y = Recovered_Mean, color = Parameter)) +
     geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "gray50") +
     geom_errorbar(aes(ymin = Lower, ymax = Upper), width = 0.2, alpha = 0.6) +
-    geom_point(size = 3) +
+    geom_point(size = 3, alpha = 0.9) +
     facet_wrap(~Scenario, nrow = 1) +
     scale_color_brewer(palette = "Set1") +
     labs(
       title = "Gradient Simulation: Parameter Recovery across Sparsity Levels",
-      subtitle = "ZIB accurately recovers parameters regardless of zero-inflation rates (10% - 60%).",
+      subtitle = "Posterior estimates align with ground truth across sparsity levels.",
       x = "True Parameter Value",
       y = "Recovered Posterior Mean",
       caption = "Error bars represent 95% HDI."
     ) +
     theme_bw(base_size = 14) +
-    theme(legend.position = "bottom")
+    theme(legend.position = "bottom",panel.grid.minor = element_blank())
 }
 
 # ==============================================================================
 # 02. The "Four-Area" Plot Analysis (Empirical)
 # ==============================================================================
 
-#' Run Empirical ZIB Analysis Loop
+#' Run Empirical HB Analysis Loop
 #' @description Iterates through AOIs and Impressions to calculate Decision vs. Intensity effects.
 #' @note Requires specific column structure in 'dataset'. Ensure columns align with indices used.
-run_empirical_zib_calc <- function(dataset, exp_label, stan_model_obj,
+run_empirical_hb_calc <- function(dataset, exp_label, stan_model_obj,
                                    GP_list = c("Glabella","Forehead","Eyebrow","Eye","Nose","Mouth"),
                                    inf_list = NULL, 
                                    seed = 1234) {
   
-  perZIB <- tibble()
+  perHB <- tibble()
   rhatsum <- tibble()
   
   CN <- c("Intercept", "Type") 
@@ -175,7 +177,7 @@ run_empirical_zib_calc <- function(dataset, exp_label, stan_model_obj,
   
   if(is.null(inf_list)) inf_list <- unique(dataset[[26]]) # Assumes infID is at col 26
   
-  print(paste(">>> Starting ZIB Loop for Experiment:", exp_label))
+  print(paste(">>> Starting HB Loop for Experiment:", exp_label))
   
   for(g in 1:length(GP_list)) { 
     for(f in 1:length(inf_list)) { 
@@ -271,19 +273,19 @@ run_empirical_zib_calc <- function(dataset, exp_label, stan_model_obj,
       # === Update ===
       if(step_result$status == "success") {
         rhatsum <- bind_rows(rhatsum, step_result$rhat)
-        perZIB <- bind_rows(perZIB, step_result$params)
+        perHB <- bind_rows(perHB, step_result$params)
       }
     }
   }
-  return(list(params = perZIB, rhat = rhatsum))
+  return(list(params = perHB, rhat = rhatsum))
 }
 
 #' Plot the 4-Area Plot (Single Experiment)
 plot_four_area_single <- function(data_file) {
   
-  ZIBsum <- data_file
+  HBsum <- data_file
   
-  data_wide <- ZIBsum %>% filter(Para != "Intercept") %>%
+  data_wide <- HBsum %>% filter(Para != "Intercept") %>%
     dplyr::select(GazeP, Impf, DisType, Para, mean, HDI_low, HDI_high, Exp) %>%
     pivot_wider(names_from = DisType, values_from = c(mean, HDI_low, HDI_high)) %>%
     filter(!is.na(`mean_Bernoulli(Choice)`) & !is.na(`mean_Beta(Weight)`)) %>%
@@ -300,7 +302,7 @@ plot_four_area_single <- function(data_file) {
     geom_point(aes(color = sig_bern, shape = sig_beta), size = 5) +
     geom_text_repel(aes(label = paste(GazeP, Impf)), size = 3, max.overlaps = 20, box.padding = 0.3) +
     labs(
-      title = "Decoupling Decision and Intensity: The 4-Area Plot",
+      title = "Decoupling Decision and Intensity",
       subtitle = "X-axis: Propensity to use Mouse (Decision). Y-axis: Duration of usage (Intensity).",
       x = "Decision Slope (Bernoulli Log-Odds)",
       y = "Intensity Slope (Beta Log-Odds)",
@@ -326,19 +328,19 @@ plot_four_area_sum <- function(data_s8, data_s12) {
   # 1. Label and Merge Data
   # -------------------------------------------------------
   # Ensure 'Exp' column exists; assign default labels if missing
-  if(!"Exp" %in% names(data_s8)) data_s8$Exp <- "Experiment 1 (S8)"
-  if(!"Exp" %in% names(data_s12)) data_s12$Exp <- "Experiment 2 (S12)"
+  if(!"Exp" %in% names(data_s8)) data_s8$Exp <- "Experiment 1"
+  if(!"Exp" %in% names(data_s12)) data_s12$Exp <- "Experiment 2"
   
   # Force standardized display labels for the plot facets
-  data_s8$Exp_Label <- "Experiment 1 (S8)"
-  data_s12$Exp_Label <- "Experiment 2 (S12)"
+  data_s8$Exp_Label <- "Experiment 1"
+  data_s12$Exp_Label <- "Experiment 2"
   
   # Combine datasets
-  ZIBsum <- bind_rows(data_s8, data_s12)
+  HBsum <- bind_rows(data_s8, data_s12)
   
   # 2. Data Transformation (Long to Wide)
   # -------------------------------------------------------
-  data_wide <- ZIBsum %>% 
+  data_wide <- HBsum %>% 
     filter(Para != "Intercept") %>%
     # Select relevant columns
     dplyr::select(GazeP, Impf, DisType, Para, mean, HDI_low, HDI_high, Exp_Label) %>%
@@ -380,7 +382,7 @@ plot_four_area_sum <- function(data_s8, data_s12) {
     # D. Scatter points 
     # Color maps to Decision significance (Primary interest)
     # Shape maps to Intensity significance (Secondary interest)
-    geom_point(aes(color = sig_bern, shape = sig_beta), size = 3, alpha = 0.8) +
+    geom_point(aes(color = sig_bern, shape = sig_beta), size =5, alpha = 0.8) +
     
     # E. Text labels (with auto-repulsion to avoid overlap)
     geom_text_repel(aes(label = paste(GazeP, Impf)), 
@@ -391,7 +393,7 @@ plot_four_area_sum <- function(data_s8, data_s12) {
     
     # G. Aesthetics and Labels
     labs(
-      title = "Decoupling Decision and Intensity: The 4-Area Plot",
+      title = "Decoupling Decision and Intensity",
       subtitle = "Comparison of Decision (X) vs. Intensity (Y) processes across two experiments.",
       x = "Decision Slope (Bernoulli Log-Odds)",
       y = "Intensity Slope (Beta Log-Odds)",
@@ -400,7 +402,7 @@ plot_four_area_sum <- function(data_s8, data_s12) {
     ) +
     scale_color_manual(values = c("FALSE" = "#95a5a6", "TRUE" = "#e74c3c")) + # Grey vs Red
     scale_shape_manual(values = c("FALSE" = 1, "TRUE" = 19)) + # Open Circle vs Solid Dot
-    theme_bw(base_size = 14) +
+    theme_bw(base_size = 16) +
     theme(legend.position = "bottom")
   
   return(p)
@@ -410,11 +412,13 @@ plot_four_area_sum <- function(data_s8, data_s12) {
 # 03. Posterior Predictive Checks (PPC) Comparison
 # ==============================================================================
 
-#' Run PPC Calculation (LMM vs Beta vs ZIB)
+#' Run PPC Calculation (LMM vs Beta vs HB)
+#' 
 run_ppc_calc <- function(dataset, exp_str, imp_str, aoi_str, mouse_str, models_list, seed = 1234, iter = 2000) {
   
-  print(paste(">>> Preparing Data for PPC:", exp_str, imp_str, aoi_str))
+  print(paste(">>> Preparing Data for PPC (Updated):", exp_str, imp_str, aoi_str))
   
+  # --- 1. Data Cleaning ---
   TDt <- dataset %>% 
     filter(Valp >= 0.6, expName == exp_str, infID == imp_str) %>%
     dplyr::select(participant, picname, all_of(aoi_str), all_of(mouse_str))
@@ -429,7 +433,7 @@ run_ppc_calc <- function(dataset, exp_str, imp_str, aoi_str, mouse_str, models_l
   Y_binary <- as.integer(Y_vec > 0)
   pos_idx <- which(Y_vec > 0)
   
-  # --- Stan Data Prep ---
+  # --- 2. Stan Data Prep (Common) ---
   data_common <- list(
     N = N_obs, D = 2,
     S = length(unique(tarDat$participant)), P = length(unique(tarDat$picname)),
@@ -437,23 +441,70 @@ run_ppc_calc <- function(dataset, exp_str, imp_str, aoi_str, mouse_str, models_l
     Y = Y_vec, X = tibble(a=1, EV=as.numeric(as.factor(tarDat$OB)))
   )
   
-  data_zib <- c(data_common, list(Y_binary = Y_binary, N_pos = length(pos_idx), pos_idx = pos_idx))
+  # A. Bayes HB Data
+  data_hb <- c(data_common, list(Y_binary = Y_binary, N_pos = length(pos_idx), pos_idx = pos_idx))
   
-  # Beta Transformation (Squeezing)
-  Y_trans <- (Y_vec * (N_obs - 1) + 0.5) / N_obs
-  data_beta <- data_common; data_beta$Y <- Y_trans
+  # B. Logit-LMM Data (Logit Transform)
+  epsilon <- 0.001 
+  Y_logit <- log((Y_vec + epsilon) / (1 - Y_vec + epsilon))
+  data_logit <- data_common
+  data_logit$Y <- Y_logit
   
-  print(">>> Fitting Models (LMM, Beta, ZIB)...")
-  fit_lmm <- sampling(models_list$LMM, data = data_common, seed = seed, iter = iter, refresh = 0)
-  fit_beta <- sampling(models_list$Beta, data = data_beta, seed = seed, iter = iter, refresh = 0)
-  fit_zib <- sampling(models_list$ZIB, data = data_zib, seed = seed, iter = iter, refresh = 0)
+  # C. Freq HB Data (glmmTMB DataFrame)
+  Y_squeezed <- (Y_vec * (N_obs - 1) + 0.5) / N_obs
+  df_freq <- data.frame(
+    Y_raw = Y_vec, 
+    Y_sq  = Y_squeezed,
+    sub = as.factor(data_common$SID),
+    item = as.factor(data_common$PID),
+    group = as.factor(tarDat$OB)
+  )
   
-  extract_rep <- function(fit) rstan::extract(fit)$Y_rep
+  print(">>> Fitting Models (Logit-LMM, Freq-HB, Bayes-HB)...")
+  
+  # --- 3. Model Fitting ---
+  
+  # Model 1: Logit-LMM
+  fit_logit <- sampling(models_list$LMM, data = data_logit, seed = seed, iter = iter, refresh = 0)
+  
+  # Model 2: Freq HB (glmmTMB)
+  m_glmm <- tryCatch({
+    glmmTMB(Y_raw ~ group + (1|sub) + (1|item), 
+            family = ordbeta(), 
+            data = df_freq)
+  }, error = function(e) {
+    message(paste("glmmTMB error:", e$message))
+    return(NULL)
+  })
+  
+  # Model 3: Bayes HB (Target)
+  fit_hb <- sampling(models_list$HB, data = data_hb, seed = seed, iter = iter, refresh = 0)
+  
+  # --- 4. Extract & Transform Predictions ---
+  
+  # A. Logit-LMM: Extract -> Inverse Logit -> [0,1]
+  y_rep_logit_raw <- rstan::extract(fit_logit)$Y_rep
+  y_rep_logit <- plogis(y_rep_logit_raw)
+  
+  # B. Freq HB: Simulate
+  if(!is.null(m_glmm)){
+    n_sims <- nrow(y_rep_logit) 
+    y_rep_freq <- t(as.matrix(simulate(m_glmm, nsim = n_sims)))
+  } else {
+    y_rep_freq <- matrix(NA, nrow = 4000, ncol = N_obs)
+  }
+  
+  # C. Bayes HB
+  y_rep_hb <- rstan::extract(fit_hb)$Y_rep
   
   return(list(
     meta = list(exp = exp_str, imp = imp_str, aoi = aoi_str, zero_prop = mean(Y_vec == 0)),
     obs = Y_vec,
-    y_rep = list(lmm = extract_rep(fit_lmm), beta = extract_rep(fit_beta), zib = extract_rep(fit_zib))
+    y_rep = list(
+      logit_lmm = y_rep_logit, 
+      freq_hb = y_rep_freq, 
+      bayes_hb = y_rep_hb
+    )
   ))
 }
 
@@ -463,7 +514,7 @@ plot_ppc_compare <- function(ppc_data, plot_xlim = c(-0.05, 0.08), n_draws = 200
   Y_vec <- ppc_data$obs
   y_rep <- ppc_data$y_rep
   meta <- ppc_data$meta
-  samp_idx <- sample(nrow(y_rep$zib), min(n_draws, nrow(y_rep$zib)))
+  samp_idx <- sample(nrow(y_rep$bayes_hb), min(n_draws, nrow(y_rep$bayes_hb)))
   
   common_theme <- theme_bw(base_size = base_font_size) + 
     theme(
@@ -473,27 +524,27 @@ plot_ppc_compare <- function(ppc_data, plot_xlim = c(-0.05, 0.08), n_draws = 200
     )
   
   # Density Plots
-  p_lmm <- ppc_dens_overlay(Y_vec, y_rep$lmm[samp_idx, ]) + coord_cartesian(xlim = plot_xlim) + 
-    labs(title = "A. LMM (Gaussian)", subtitle = "Failure: Leakage into negative values") + common_theme
+  p_lmm <- ppc_dens_overlay(Y_vec, y_rep$logit_lmm[samp_idx, ]) + coord_cartesian(xlim = plot_xlim) + 
+    labs(title = "A. Logit-LMM (Transformed)", subtitle = "Failure: Cannot produce true zeros") + common_theme
   
-  p_beta <- ppc_dens_overlay(Y_vec, y_rep$beta[samp_idx, ]) + coord_cartesian(xlim = plot_xlim) + 
-    labs(title = "B. Beta (Transformed)", subtitle = "Failure: Cannot produce true zeros") + common_theme
+  p_beta <- ppc_dens_overlay(Y_vec, y_rep$freq_hb[samp_idx, ]) + coord_cartesian(xlim = plot_xlim) + 
+    labs(title = "B. Freq HB (glmmTMB)", subtitle = "Failure: Cannot produce true zeros") + common_theme
   
-  p_zib <- ppc_dens_overlay(Y_vec, y_rep$zib[samp_idx, ]) + coord_cartesian(xlim = plot_xlim) + 
-    labs(title = "C. ZIB Model", subtitle = "Success: Captures bimodal structure") + common_theme + 
+  p_hb <- ppc_dens_overlay(Y_vec, y_rep$bayes_hb[samp_idx, ]) + coord_cartesian(xlim = plot_xlim) + 
+    labs(title = "C. Bayes HB Model", subtitle = "Success: Captures bimodal structure") + common_theme + 
     theme(legend.position = c(0.8, 0.7))
   
   # Zero Stats
-  p_stat_lmm <- ppc_stat(Y_vec, y_rep$lmm, stat = function(y) mean(y <= 0)) + 
-    labs(title = "D. LMM Zero/Neg Pred", x = "Proportion <= 0") + common_theme
+  p_stat_lmm <- ppc_stat(Y_vec, y_rep$logit_lmm, stat = function(y) mean(y <= 0)) + 
+    labs(title = "D. Logit-LMM Zero Pred") + common_theme
   
-  p_stat_beta <- ppc_stat(Y_vec, y_rep$beta, stat = function(y) mean(y == 0)) + 
-    labs(title = "E. Beta Zero Pred", x = "Proportion == 0") + common_theme
+  p_stat_beta <- ppc_stat(Y_vec, y_rep$freq_hb, stat = function(y) mean(y == 0)) + 
+    labs(title = "E. Freq HB (glmmTMB) Zero Pred") + common_theme
   
-  p_stat_zib <- ppc_stat(Y_vec, y_rep$zib, stat = function(y) mean(y == 0)) + 
-    labs(title = "F. ZIB Zero Pred", x = "Proportion == 0") + common_theme
+  p_stat_hb <- ppc_stat(Y_vec, y_rep$bayes_hb, stat = function(y) mean(y == 0)) + 
+    labs(title = "F. Bayes HB Zero Pred") + common_theme
   
-  (p_lmm + p_beta + p_zib) / (p_stat_lmm + p_stat_beta + p_stat_zib) +
+  (p_lmm + p_beta + p_hb) / (p_stat_lmm + p_stat_beta + p_stat_hb) +
     plot_annotation(
       title = paste0("Methodological Breakdown: '", meta$aoi, "' (", round(meta$zero_prop*100, 1), "% Zeros)"),
       theme = theme(plot.title = element_text(face = "bold", size = base_font_size * 1.2))
@@ -504,15 +555,14 @@ plot_ppc_compare <- function(ppc_data, plot_xlim = c(-0.05, 0.08), n_draws = 200
 # 04. Model Performance Scoring (CRPS, RMSE, MAE)
 # ==============================================================================
 
-#' Calculate Performance Metrics for All Models
 run_performance_calc <- function(dataset, models_list, exp_list = c("S8", "S12"),
                                  aoi_list = c("GazeGL", "GazeFH", "GazeEB", "GazeEY", "GazeNO", "GazeMO"),
-                                 seed = 1234, iter = 2000) {
+                                 seed = 1234, chains=2, iter = 2000) {
   
   comparison_results <- tibble()
   imp_list <- unique(dataset$infID)
   
-  print(">>> Starting Universal Model Comparison (CRPS & RMSE & MAE)...")
+  print(">>> Starting Universal Model Comparison (Enhanced with Logit-LMM & glmmTMB)...")
   
   for(exp in exp_list) {
     for(aoi_idx in 1:length(aoi_list)) {
@@ -525,6 +575,7 @@ run_performance_calc <- function(dataset, models_list, exp_list = c("S8", "S12")
         print(paste("Processing:", label))
         
         tryCatch({
+          # --- Data Prep ---
           TDt <- dataset %>% filter(Valp >= 0.6, expName == exp, infID == imp) %>%
             dplyr::select(participant, picname, all_of(target_aoi), all_of(target_mouse))
           
@@ -538,39 +589,95 @@ run_performance_calc <- function(dataset, models_list, exp_list = c("S8", "S12")
             SID = as.numeric(as.factor(tarDat$participant)), PID = as.numeric(as.factor(tarDat$picname)),
             Y = Y_vec, X = tibble(a=1, EV=as.numeric(as.factor(tarDat$OB)))
           )
-          data_zib <- c(data_common, list(Y_binary = as.integer(Y_vec > 0), N_pos = sum(Y_vec > 0), pos_idx = which(Y_vec > 0)))
-          data_beta <- data_common; data_beta$Y <- (Y_vec * (N_obs - 1) + 0.5) / N_obs
           
-          # Fitting
-          fit_lmm <- sampling(models_list$LMM, data = data_common, seed = seed, chains=2, cores=2, iter=iter, refresh=0)
-          fit_beta <- sampling(models_list$Beta, data = data_beta, seed = seed, chains=2, cores=2, iter=iter, refresh=0)
-          fit_zib <- sampling(models_list$ZIB, data = data_zib, seed = seed, chains=2, cores=2, iter=iter, refresh=0)
+          # 1. HB (Bayesian) Data
+          data_hb <- c(data_common, list(Y_binary = as.integer(Y_vec > 0), N_pos = sum(Y_vec > 0), pos_idx = which(Y_vec > 0)))
           
-          # Extraction & Calculation
-          y_rep_lmm <- t(rstan::extract(fit_lmm)$Y_rep)
+          # 2. Beta (Squeezed) Data
+          Y_squeezed <- (Y_vec * (N_obs - 1) + 0.5) / N_obs
+          data_beta <- data_common; data_beta$Y <- Y_squeezed
+          
+          # 3. Logit-LMM Data (NEW: Empirical Logit)
+          # Assuming N=1 for trial-level data weight, or use sample size if available
+          # formula: log((y + 0.5)/(1 - y + 0.5)) essentially
+          epsilon <- 0.001 # Small constant for empirical logit
+          Y_logit <- log((Y_vec + epsilon) / (1 - Y_vec + epsilon))
+          data_logit <- data_common; data_logit$Y <- Y_logit
+          
+          # --- Fitting Models ---
+          
+          # A. Stan Models
+          fit_hb <- sampling(models_list$HB, data = data_hb, seed = seed, chains=chains, cores=2, iter=iter, refresh=0)
+          fit_beta <- sampling(models_list$Beta, data = data_beta, seed = seed, chains=chains, cores=2, iter=iter, refresh=0)
+          # Reuse LMM code but feed Logit Data
+          fit_logit_lmm <- sampling(models_list$LMM, data = data_logit, seed = seed, chains=chains, cores=2, iter=iter, refresh=0)
+          
+          # B. Frequentist HB (glmmTMB) 
+          # Prepare dataframe for glmmTMB
+          df_freq <- data.frame(
+            Y_raw = Y_vec, 
+            Y_sq  = Y_squeezed,
+            sub = as.factor(data_common$SID),
+            item = as.factor(data_common$PID),
+            group = as.factor(tarDat$OB)
+          )
+          
+          # Fit glmmTMB (Hurdle Beta)
+          # ziformula ~ 1 (simple ZI) or ~ group (ZI depends on condition)
+          # dispformula ~ 1
+          m_glmm <- tryCatch({
+            glmmTMB(Y_raw ~ group + (1|sub) + (1|item), 
+                    family = ordbeta(), 
+                    data = df_freq)
+          }, error = function(e) {
+            message(paste("glmmTMB error:", e$message))
+            return(NULL)
+          })
+          
+          if(is.null(m_glmm)) next # Skip if glmmTMB fails completely
+          
+          # --- Extraction & Simulation ---
+          
+          # Stan Extracts
+          y_rep_hb <- t(rstan::extract(fit_hb)$Y_rep)
           y_rep_beta <- t(rstan::extract(fit_beta)$Y_rep)
-          y_rep_zib <- t(rstan::extract(fit_zib)$Y_rep)
           
+          # Logit-LMM: Need to transform PREDICTIONS back to probability scale [0,1]
+          y_rep_logit_raw <- t(rstan::extract(fit_logit_lmm)$Y_rep)
+          # Inverse Logit transformation to map back to [0,1] for valid comparison
+          y_rep_logit <- plogis(y_rep_logit_raw) 
+          
+          # glmmTMB: Simulate 'posterior' draws
+          # This creates a matrix of size N_obs x nsim, mimicking Stan output
+          y_rep_glmm <- as.matrix(simulate(m_glmm, nsim = 4000)) # 4000 to match Stan (2 chains * 2000 iter)
+          
+          # --- Metrics Calculation ---
           get_metrics <- function(truth, pred_mat) {
             pred_mean <- colMeans(pred_mat)
             resid <- truth - pred_mean
             c(rmse = sqrt(mean(resid^2)), mae = mean(abs(resid)))
           }
-          m_lmm <- get_metrics(Y_vec, t(y_rep_lmm))
+          
+          m_hb <- get_metrics(Y_vec, t(y_rep_hb))
           m_beta <- get_metrics(Y_vec, t(y_rep_beta))
-          m_zib <- get_metrics(Y_vec, t(y_rep_zib))
+          m_logit <- get_metrics(Y_vec, t(y_rep_logit))
+          m_glmm_freq <- get_metrics(Y_vec, t(y_rep_glmm))
           
           this_res <- tibble(
             Exp = exp, AOI = target_aoi, Imp = imp, Zero_Prop = mean(Y_vec == 0),
-            Model = c("LMM", "Beta", "ZIB"),
-            CRPS = c(mean(crps_sample(y = Y_vec, dat = y_rep_lmm)), 
-                     mean(crps_sample(y = Y_vec, dat = y_rep_beta)), 
-                     mean(crps_sample(y = Y_vec, dat = y_rep_zib))),
-            RMSE = c(m_lmm["rmse"], m_beta["rmse"], m_zib["rmse"]),
-            MAE  = c(m_lmm["mae"], m_beta["mae"], m_zib["mae"])
+            Model = c("Bayes_HB", "Bayes_Beta", "Logit_LMM", "Freq_HB"),
+            CRPS = c(mean(crps_sample(y = Y_vec, dat = y_rep_hb)), 
+                     mean(crps_sample(y = Y_vec, dat = y_rep_beta)),
+                     mean(crps_sample(y = Y_vec, dat = y_rep_logit)),
+                     mean(crps_sample(y = Y_vec, dat = y_rep_glmm))), # Works because y_rep_glmm simulates the distribution
+            RMSE = c(m_hb["rmse"], m_beta["rmse"], m_logit["rmse"], m_glmm_freq["rmse"]),
+            MAE  = c(m_hb["mae"], m_beta["mae"], m_logit["mae"], m_glmm_freq["mae"])
           )
+          
           comparison_results <- bind_rows(comparison_results, this_res)
-          rm(fit_lmm, fit_beta, fit_zib, y_rep_lmm, y_rep_beta, y_rep_zib); gc()
+          
+          # Clean up
+          rm(fit_hb, fit_beta, fit_logit_lmm, m_glmm); gc()
           
         }, error = function(e) message(paste("Error in", label, ":", e$message)))
       }
@@ -580,20 +687,58 @@ run_performance_calc <- function(dataset, models_list, exp_list = c("S8", "S12")
 }
 
 plot_crps_trend <- function(results_df) {
-  plot_data <- results_df %>% filter(Model != "LMM") %>% 
-    left_join(results_df %>% filter(Model == "LMM") %>% dplyr::select(AOI, Imp, Exp, CRPS_LMM = CRPS), by = c("AOI", "Imp", "Exp")) %>%
+  plot_data <- results_df %>% filter(Model != "Logit_LMM") %>% 
+    left_join(results_df %>% filter(Model == "Logit_LMM") %>% dplyr::select(AOI, Imp, Exp, CRPS_LMM = CRPS), by = c("AOI", "Imp", "Exp")) %>%
     mutate(Improvement_CRPS = (CRPS_LMM - CRPS) / CRPS_LMM, Cluster = ifelse(Zero_Prop < 0.3, "Low_Sparsity", "High_Sparsity"))
   
   ggplot(plot_data, aes(x = Zero_Prop, y = Improvement_CRPS, color = Model, fill = Model)) +
     geom_hline(yintercept = 0, color = "black") +
     geom_smooth(aes(group = interaction(Model, Cluster)), method = "lm", alpha = 0.2) +
     geom_point(alpha = 0.7, size = 3, shape = 21, color = "white", stroke = 0.5) +
-    scale_y_continuous(labels = scales::percent, name = "Probabilistic Advantage (CRPS vs. LMM)") +
-    scale_x_continuous(labels = scales::percent, name = "Data Sparsity (% Zeros)") +
-    scale_color_manual(values = c("Beta" = "#e74c3c", "ZIB" = "#3498db")) +
-    scale_fill_manual(values = c("Beta" = "#e74c3c", "ZIB" = "#3498db")) +
+    scale_y_continuous(labels = scales::percent, name = "Probabilistic Advantage (CRPS vs. Logit LMM)") +
+    scale_x_continuous(labels = scales::percent, name = "Data Sparsity (Proportion of Zeros)") +
+    scale_color_manual(values = c("Bayes_Beta" = "#e74c3c", "Bayes_HB" = "#3498db","Freq_HB"="#2ecc71")) +
+    scale_fill_manual(values = c("Bayes_Beta" = "#e74c3c", "Bayes_HB" = "#3498db","Freq_HB"="#2ecc71")) +
     labs(title = "Probabilistic Model Superiority (CRPS)", caption = "Trend lines fitted by sparsity cluster.") +
     theme_bw(base_size = 14) + theme(legend.position = "bottom")
+}
+
+plot_rmse_trend <- function(results_df) {
+  plot_data <- results_df %>%mutate(Cluster = ifelse(Zero_Prop < 0.3, "Low_Sparsity", "High_Sparsity"))
+  p <- ggplot(plot_data, aes(x = Zero_Prop, y = RMSE, color = Model, group = Model)) +
+    geom_point(alpha = 0.6, size = 2) +
+    geom_smooth(aes(group = interaction(Model, Cluster)),method = "lm", se = TRUE, alpha = 0.1, linewidth = 1.2) +
+    scale_color_manual(values = c("Freq_HB" = "#2ecc71", "Bayes_Beta" = "#e74c3c", "Bayes_HB" = "#3498db","Logit_LMM"="black")) +
+    scale_x_continuous(labels = scales::percent, name = "Data Sparsity (Proportion of Zeros)") +
+    scale_y_continuous(name = "Predictive Error (RMSE)") +
+    coord_cartesian(ylim = c(0, NA)) +
+    labs(title = "Model Performance Across the Sparsity Spectrum (RMSE)",
+      caption = "RMSE is non-negative by definition.") +
+    theme_bw(base_size = 14) +
+    theme(legend.position = "bottom")
+  return(p)
+}
+
+plot_mae_trend <- function(results_df) {
+  plot_data_mae <- results_df %>%filter(Model != "Logit_LMM") %>%
+    left_join(results_df %>% filter(Model == "Logit_LMM") %>% dplyr::select(AOI, Imp, Exp, MAE_LMM = MAE),
+              by = c("AOI", "Imp", "Exp")) %>%
+    mutate(Improvement_MAE = (MAE_LMM - MAE) / MAE_LMM,
+           Cluster = ifelse(Zero_Prop < 0.3, "Low_Sparsity", "High_Sparsity"))
+  
+  p <- ggplot(plot_data_mae, aes(x = Zero_Prop, y = Improvement_MAE, color = Model, fill = Model)) +
+    geom_hline(yintercept = 0, linetype = "solid", color = "black", linewidth = 0.5) +
+    geom_smooth(aes(group = interaction(Model, Cluster)),
+                method = "lm", se = TRUE, alpha = 0.2, linewidth = 1.2) +
+    geom_point(alpha = 0.6, size = 3) +
+    scale_y_continuous(labels = scales::percent, name = "Predictive Advantage (MAE vs. Logit LMM)") +
+    scale_x_continuous(labels = scales::percent, name = "Data Sparsity (Proportion of Zeros)") +
+    scale_color_manual(values = c("Freq_HB" = "#2ecc71", "Bayes_Beta" = "#e74c3c", "Bayes_HB" = "#3498db")) +
+    scale_fill_manual(values = c("Freq_HB" = "#2ecc71", "Bayes_Beta" = "#e74c3c", "Bayes_HB" = "#3498db")) +
+    labs(title = "Model Superiority across the Sparsity Spectrum (MAE)") +
+    theme_bw(base_size = 14) +
+    theme(legend.position = "bottom", plot.title = element_text(face = "bold"))
+  return(p)
 }
 
 # ==============================================================================
@@ -625,11 +770,11 @@ run_sensitivity_calc <- function(dataset, stan_model_obj, exp_list, aoi_list, se
           data_common <- list(N=N_obs, D=2, S=length(unique(tarDat$participant)), P=length(unique(tarDat$picname)),
                               SID=as.numeric(as.factor(tarDat$participant)), PID=as.numeric(as.factor(tarDat$picname)),
                               Y=Y_vec, X=tibble(a=1, EV=as.numeric(as.factor(tarDat$OB))))
-          data_zib <- c(data_common, list(Y_binary=as.integer(Y_vec>0), N_pos=sum(Y_vec>0), pos_idx=which(Y_vec>0)))
+          data_hb <- c(data_common, list(Y_binary=as.integer(Y_vec>0), N_pos=sum(Y_vec>0), pos_idx=which(Y_vec>0)))
           
           # Priors
-          data_orig <- c(data_zib, list(prior_beta_sd=5, prior_phi_sd=100, prior_sd_scale=2.5))
-          data_diff <- c(data_zib, list(prior_beta_sd=10, prior_phi_sd=200, prior_sd_scale=10))
+          data_orig <- c(data_hb, list(prior_beta_sd=5, prior_phi_sd=100, prior_sd_scale=2.5))
+          data_diff <- c(data_hb, list(prior_beta_sd=10, prior_phi_sd=200, prior_sd_scale=10))
           
           # Fit
           fit_orig <- sampling(stan_model_obj, data=data_orig, seed=seed, chains=2, cores=2, iter=iter, refresh=0)
@@ -657,21 +802,21 @@ run_sensitivity_calc <- function(dataset, stan_model_obj, exp_list, aoi_list, se
 plot_sensitivity_check <- function(sens_results) {
   ggplot(sens_results, aes(x = Estimate_Original, y = Estimate_Diffuse)) +
     geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "gray60") +
-    geom_point(aes(color = AOI), alpha = 0.6, size = 2) +
+    geom_point(aes(color = AOI), alpha = 0.6, size = 4) +
     facet_wrap(~Parameter, scales = "free") +
     labs(
       title = "Prior Sensitivity Analysis",
       subtitle = "Bernoulli estimates show regularization in extreme regimes; Beta estimates remain robust.",
       x = "Weakly Informative Priors", y = "Diffuse Priors"
-    ) + theme_bw(base_size = 14) + theme(legend.position = "bottom")
+    ) + theme_bw(base_size = 16) + theme(legend.position = "bottom")
 }
 
 # ==============================================================================
 # 06. General Diagnostics & Final Plotting
 # ==============================================================================
 
-#' Universal ZIB Analysis Pipeline for Single Condition
-run_zib_analysis <- function(dataset, stan_model_obj, 
+#' Universal HB Analysis Pipeline for Single Condition
+run_hb_analysis <- function(dataset, stan_model_obj, 
                              exp_str = "S8", condition_col = "infID", condition_val = "Ext", 
                              target_y = "GazeMO", target_y_pair = NULL, predictors = NULL, 
                              valp_thresh = 0.6, seed = 1234, chains = 4, iter = 2000) {
@@ -723,7 +868,7 @@ run_zib_analysis <- function(dataset, stan_model_obj,
   return(list(fit = fit, results = res_df, mode = mode, meta = list(predictors = pred_names)))
 }
 
-plot_zib_diagnostics <- function(analysis_obj,trace_pars=c("bz[1,2]", "bz[2,2]", "phi")) {
+plot_hb_diagnostics <- function(analysis_obj,trace_pars=c("bz[1,2]", "bz[2,2]", "phi")) {
   fit <- analysis_obj$fit
   fit_sum <- rstan::summary(fit)$summary
   rhats <- fit_sum[, "Rhat"]; neff <- fit_sum[, "n_eff"] / (fit@sim$iter * fit@sim$chains / 2)
@@ -733,22 +878,23 @@ plot_zib_diagnostics <- function(analysis_obj,trace_pars=c("bz[1,2]", "bz[2,2]",
   kept <- unlist(lapply(pars_regex, function(x) grep(paste0("^", x), all_pars, value = TRUE)))
   
   p_rhat <- mcmc_rhat(rhats[kept]) + labs(title = "A. Convergence (R-hat)") + theme_bw()
-  p_neff <- mcmc_neff(neff[kept]) + labs(title = "B. Sampling Efficiency") + theme_bw()
+  p_neff <- mcmc_neff(neff[kept]) + labs(title = "B. Sampling Efficiency (ESS)") + theme_bw()
   
   # Traceplots for first 2 predictors
   trace_pars <-trace_pars
-  p_trace <- mcmc_trace(fit, pars = trace_pars[trace_pars %in% names(fit)], facet_args = list(ncol = 1)) + labs(title = "C. Traceplots") + theme_bw()
+  p_trace <- mcmc_trace(fit, pars = trace_pars[trace_pars %in% names(fit)], facet_args = list(ncol = 1)) + 
+    labs(title = "C. Traceplots (Key Params)") + theme_bw()
   
   (p_rhat / p_neff) | p_trace
 }
 
-plot_zib_forest <- function(analysis_obj) {
+plot_hb_forest <- function(analysis_obj) {
   res_df <- analysis_obj$results %>% filter(Predictor != "Intercept")
   ggplot(res_df, aes(y = Predictor, x = Mean, xmin = Lower, xmax = Upper, color = Is_Significant)) +
     geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
     geom_errorbarh(height = 0.2, linewidth = 1) + geom_point(size = 4) +
     facet_wrap(~Process, scales = "free_x") +
     scale_color_manual(values = c("Not Significant" = "gray", "Significant" = "#E74C3C")) +
-    labs(title = paste("ZIB Effects:", unique(res_df$Exp), "|", unique(res_df$Condition)), x = "Effect Size (Log-Odds)") +
+    labs(title = paste("HB Effects:", unique(res_df$Exp), "|", unique(res_df$Condition)), x = "Effect Size (Log-Odds)") +
     theme_bw(base_size = 14) + theme(legend.position = "bottom")
 }
