@@ -26,7 +26,7 @@ The project is organized into four main directories:
     * `sumGDT.csv`: Analysis-ready data.
     * `variable_codebook.txt`: Detailed description of all variables.
 * **`preprocessing/`**: Documentation of the data cleaning process.
-    * `00_Raw_to_Clean.R`: Logic for converting raw Tobii/PsychoPy outputs to the analysis dataset.
+    * `Raw_to_Clean.R`: Logic for converting raw Tobii/PsychoPy outputs to the analysis dataset.
 
 ## 💻 Computational Environment
 
