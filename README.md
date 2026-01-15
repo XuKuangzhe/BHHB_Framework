@@ -1,14 +1,13 @@
 # Replication Materials: The BHHB Framework
 
-**Authors:** Kuangzhe Xu   
-**License:** MIT License  
+**Authors:** Kuangzhe Xu    
+**License:** MIT License   
 
 ## 📌 Overview
 
 This repository contains the data, R code, and Stan model specifications for the manuscript *"The BHHB Framework: Decoupling Decision and Intensity in Visual Attention"*.
 
 The core contribution is the **Bayesian Hierarchical Hurdle Beta (BHHB)** framework. Unlike previous Zero-Inflated Beta (ZIB) approaches that assume a mixture process, the BHHB framework adopts a two-part Hurdle assumption. It statistically decouples the decision process (whether to orient) from the intensity process (how long to maintain attention). This distinction provides improved ecological validity for high-frequency eye-tracking data where zeros represent structural non-engagement rather than measurement artifacts.
-
 
 ## 📂 Repository Structure
 
@@ -58,7 +57,7 @@ The analysis relies heavily on the `rstan` ecosystem and the `tidyverse`. Below 
 
 *Note: A full snapshot of the session information, including all dependencies, is provided in `session_info.txt`.*
 
-## 🚀 Usage Instructions
+## 🚀 Usage Instructions (Reproduction)
 
 1.  **Clone or Download** this repository to your local machine.
 2.  Open `analysis/Master_Execution.R` in RStudio.
@@ -70,28 +69,26 @@ The analysis relies heavily on the `rstan` ecosystem and the `tidyverse`. Below 
 4.  **Install Missing Packages**: Run the dependency check at the top of `Master_Execution.R`.
 5.  **Run the Pipeline**: Execute the script line-by-line or source the entire file. The script is divided into sections corresponding to the paper's results:
     * Simulation (Parameter Recovery): Verifies parameter recovery across sparsity levels (10%–90% zeros).
-    * Empirical Analysis: Generates the "Decision-Intensity State Space"(The 4-Area Plot).
+    * Empirical Analysis: Generates the "Decision-Intensity State Space" (The 4-Area Plot).
     * Model Comparison: Calculates CRPS/RMSE/MAE comparing BHHB, Logit-LMM, and Freq-HB.
     * Diagnostics: Generates PPC plots for density collapse checks.
-    * Another: General Diagnostics / Sensitivity Analysis
+    * Sensitivity Analysis: Checks prior robustness.
 
-## 🛡️ Data Availability & Privacy
+---
 
-**Analysis Data:**
-The dataset `data/sumGDT.csv` is provided for reproduction purposes. It contains anonymized, feature-extracted behavioral metrics.
+## ⚡ Quick Start Guide: Applying BHHB to New Data
 
-**Originality Statement:** 
-This dataset is multimodal. While the eye-tracking component utilizes a previously established experimental design, the mouse-tracking data are original to this study and have not been published elsewhere. The raw coordinate logs are excluded due to size constraints but are available upon reasonable request.
+This toolkit is designed to be a domain-specific workflow wrapper. You do not need to write raw Stan code to use it. Follow these steps to apply the BHHB framework to your own eye-tracking data.
 
-**Raw Data:**
-The raw eye-tracking data files (high-frequency coordinate logs) are **not included** in this repository due to their large file size and privacy considerations regarding participant metadata. However, the script `preprocessing/00_Raw_to_Clean.R` is included to transparently demonstrate the logic used to derive the analysis dataset from the raw inputs.
+### 1. Setup Environment
+Load the necessary libraries and the custom function suite.
 
-## 📄 Citation
+```r
+library(tidyverse)
+library(rstan)
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
 
-If you use this code or model in your research, please cite the following paper:
-
-> Xu, K. (Under Review). The BHHB Framework: Decoupling Decision and Intensity in Visual Attention. Behavior Research Methods.
-
-## 📞 Contact
-
-For questions regarding the code or data, please create a GitHub Issue or contact the corresponding author.
+# Source the toolkit functions
+source("analysis/HB_Functions.R")
+source("analysis/HDI.R")
