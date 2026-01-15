@@ -92,6 +92,7 @@ rstan_options(auto_write = TRUE)
 # Source the toolkit functions
 source("analysis/HB_Functions.R")
 source("analysis/HDI.R")
+```
 
 ### 2. Prepare Your Data
 Ensure your data is in a long format with the following structure:
@@ -120,6 +121,7 @@ results <- run_hb_analysis(
   chains = 4,
   iter = 2000
 )
+```
 
 ### 4. Visualize Results
 Generate the "Decision-Intensity State Space" plot to interpret cognitive strategies.
@@ -130,6 +132,7 @@ params <- results$results
 
 # Generate the 4-Quadrant Plot
 plot_four_area_single(params)
+```
 
 ## 🛡️ Data Availability & Privacy
 
