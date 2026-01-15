@@ -92,3 +92,62 @@ rstan_options(auto_write = TRUE)
 # Source the toolkit functions
 source("analysis/HB_Functions.R")
 source("analysis/HDI.R")
+
+### 2. Prepare Your Data
+Ensure your data is in a long format with the following structure:
+* **Participant ID** (Column for Random Effect 1)
+* **Item/Stimulus ID** (Column for Random Effect 2)
+* **Condition** (Predictor Column)
+* **Target Variable** (e.g., Gaze Proportion, range [0, 1])
+
+### 3. Run the Analysis Wrapper
+Use the `run_hb_analysis` function. This wrapper handles data cleaning, compilation, sampling, and parameter extraction automatically.
+
+```r
+# Compile the Stan model (only needs to be done once per session)
+hb_model <- stan_model("models/HB_main.stan")
+
+# Execute the analysis
+# Example: Analyzing 'Gaze_Prop' in Condition 'TreatmentA'
+results <- run_hb_analysis(
+  dataset = my_data,           # Your dataframe
+  stan_model_obj = hb_model,   # Compiled model object
+  exp_str = "Exp1",            # Experiment Label (for plotting)
+  condition_col = "Condition", # Column name for experimental condition
+  condition_val = "TreatmentA",# Specific level to analyze
+  target_y = "Gaze_Prop",      # Dependent variable column name
+  predictors = c("Condition"), # Predictors for fixed effects (or NULL)
+  chains = 4,
+  iter = 2000
+)
+
+### 4. Visualize Results
+Generate the "Decision-Intensity State Space" plot to interpret cognitive strategies.
+
+```r
+# Extract parameters
+params <- results$results
+
+# Generate the 4-Quadrant Plot
+plot_four_area_single(params)
+
+## 🛡️ Data Availability & Privacy
+
+**Analysis Data:**
+The dataset `data/sumGDT.csv` is provided for reproduction purposes. It contains anonymized, feature-extracted behavioral metrics.
+
+**Originality Statement:**
+This dataset is multimodal. While the eye-tracking component utilizes a previously established experimental design, the mouse-tracking data are original to this study and have not been published elsewhere.
+
+**Raw Data:**
+The raw eye-tracking data files (high-frequency coordinate logs) are **not included** in this repository due to their large file size and privacy considerations regarding participant metadata. However, the script `preprocessing/Raw_to_Clean.R` is included to transparently demonstrate the logic used to derive the analysis dataset from the raw inputs (specifically the validity filtering logic).
+
+## 📄 Citation
+
+If you use this code or model in your research, please cite the following paper:
+
+> Xu, K. (Under Review). The BHHB Framework: Decoupling Decision and Intensity in Visual Attention. Behavior Research Methods.
+
+## 📞 Contact
+
+For questions regarding the code or data, please create a GitHub Issue or contact the corresponding author.
