@@ -1,5 +1,5 @@
 ################################################################################
-# Project: Decoupling Decision and Intensity in Social Perception
+# Project: Decoupling Decision and Intensity in Visual Attention
 # Script: Master Analysis Execution Pipeline
 # Author: Xu Kuangzhe
 # Date: 2026-01
@@ -35,9 +35,9 @@ path_out  <- "./results/"  # Output directory
 if(!dir.exists(path_out)) dir.create(path_out)
 
 # --- Source Helper Functions ---
-# Note: Ensure ZIB_Functions.R is the one we defined previously
+# Note: Ensure HB_Functions.R is the one we defined previously
 source(file.path(path_code, 'HDI.R')) 
-source(file.path(path_code, 'ZIB_Functions.R'))
+source(file.path(path_code, 'HB_Functions.R'))
 
 # ==============================================================================
 # 01. Data Loading & Preprocessing
@@ -46,12 +46,15 @@ print(">>> Loading Data...")
 # Adjust file name as needed
 sumGDT <- read_csv(file.path(path_data, "sumGDT.csv"), show_col_types = FALSE)
 
+threshold <- 1e-5
+
 # Preprocessing: Extract infID and expName
 sumGDTs <- sumGDT %>%
   mutate(
     infID = str_sub(picname, 1, 3),
     expName = str_sub(expName, 13, 15) # Adjust indices based on your string format
-  )
+  )%>%mutate(across(starts_with("Gaze"), ~ ifelse(. < threshold, 0, .)),
+             across(starts_with("Mouse"), ~ ifelse(. < threshold, 0, .)))
 
 # Inspection
 print(head(sumGDTs))
@@ -61,18 +64,18 @@ print(head(sumGDTs))
 # ==============================================================================
 print(">>> Compiling Stan Models (This may take a minute)...")
 
-# Main ZIB Model
-ZIBmodvef  <- stan_model(file.path(path_model, "ZIB_main.stan"))
+# Main HB Model
+HBmodvef  <- stan_model(file.path(path_model, "HB_main.stan"))
 
 # Competitor Models (for PPC & Comparison)
 LMMmod     <- stan_model(file.path(path_model, "LMM_baseline.stan"))
 BetaMod    <- stan_model(file.path(path_model, "Beta_squeezed.stan"))
 
 # Sensitivity Analysis Model (Allows custom priors)
-model_sens <- stan_model(file.path(path_model, "ZIB_sensitivity.stan"))
+model_sens <- stan_model(file.path(path_model, "HB_sensitivity.stan"))
 
 # Bundle for passing to functions
-models_list <- list(ZIB = ZIBmodvef, LMM = LMMmod, Beta = BetaMod)
+models_list <- list(HB = HBmodvef, LMM = LMMmod, Beta = BetaMod)
 
 # ==============================================================================
 # 03. Parameter Recovery Check (Simulation)
@@ -81,8 +84,8 @@ print(">>> Running Section 03: Parameter Recovery...")
 
 # Run Simulation
 sim_results_df <- run_grad_sim_calc(
-  stan_model_obj = ZIBmodvef, 
-  target_props = c(0.10, 0.30, 0.60),
+  stan_model_obj = HBmodvef, 
+  target_props = c(0.10, 0.30, 0.60, 0.90),
   iter = 2000
 )
 
@@ -100,21 +103,21 @@ print(p_sim)
 print(">>> Running Section 04: Empirical 4-Area Plot...")
 
 # --- Experiment 1 (S8) ---
-res_s8 <- run_empirical_zib_calc(
+res_s8 <- run_empirical_hb_calc(
   dataset = sumGDTs, 
   exp_label = "S8", 
-  stan_model_obj = ZIBmodvef
+  stan_model_obj = HBmodvef
 )
 # Optional: Save intermediate results
-# write_csv(res_s8$params, file.path(path_out, "ZIB_S8_Params.csv"))
+# write_csv(res_s8$params, file.path(path_out, "HB_S8_Params.csv"))
 
 # --- Experiment 2 (S12) ---
-res_s12 <- run_empirical_zib_calc(
+res_s12 <- run_empirical_hb_calc(
   dataset = sumGDTs, 
   exp_label = "S12", 
-  stan_model_obj = ZIBmodvef
+  stan_model_obj = HBmodvef
 )
-# write_csv(res_s12$params, file.path(path_out, "ZIB_S12_Params.csv"))
+# write_csv(res_s12$params, file.path(path_out, "HB_S12_Params.csv"))
 
 # --- Plotting ---
 # Single Plot Example (S8)
@@ -148,7 +151,7 @@ ppc_data <- run_ppc_calc(
 )
 
 # Plot
-p_ppc <- plot_ppc_compare(ppc_data,base_font_size = 16)
+p_ppc <- plot_ppc_compare(ppc_data)
 print(p_ppc)
 
 # ggsave(file.path(path_out, "Fig3_PPC_Method_Breakdown.png"), p_ppc, width = 12, height = 8)
@@ -167,6 +170,10 @@ perf_results <- run_performance_calc(
 )
 
 # write_csv(perf_results, file.path(path_out, "Universal_Model_Comparison_Metrics.csv"))
+
+perf_results%>%group_by(Model)%>%
+  summarise(MeanCRPS=mean(CRPS),MeanRMSE=mean(RMSE),MeanMAE=mean(MAE))%>%
+  arrange(MeanCRPS)
 
 # Plot Trends
 p_rmse <- plot_rmse_trend(perf_results)
@@ -208,30 +215,30 @@ print(p_sens)
 print(">>> Running Section 08: Diagnostics...")
 
 # --- Mode A: Category Comparison (Gaze vs Mouse) ---
-res_cat <- run_zib_analysis(
+res_cat <- run_hb_analysis(
   dataset = sumGDTs,
-  stan_model_obj = ZIBmodvef,
+  stan_model_obj = HBmodvef,
   exp_str = "S12",
   condition_col = "infID", condition_val = "Ext",
   target_y_pair = c("GazeMO", "MouseMO"), 
   predictors = NULL # NULL triggers comparison mode
 )
 
-print(plot_zib_diagnostics(res_cat))
-print(plot_zib_forest(res_cat))
+print(plot_hb_diagnostics(res_cat))
+print(plot_hb_forest(res_cat))
 
 # --- Mode B: Personality Regression ---
-res_reg <- run_zib_analysis(
+res_reg <- run_hb_analysis(
   dataset = sumGDTs,
-  stan_model_obj = ZIBmodvef,
+  stan_model_obj = HBmodvef,
   exp_str = "S12",
-  condition_col = "infID", condition_val = "Ext",
-  target_y = "GazeFH",
+  condition_col = "infID", condition_val = "Agr",
+  target_y = "GazeMO",
   predictors = c("Ext", "Agr", "Con", "Neu", "Ope") # Regression mode
 )
 
 # Specific Traceplots
-print(plot_zib_diagnostics(res_reg, trace_pars=c("bz[1,2]", "bz[2,2]", "phi")))
-print(plot_zib_forest(res_reg))
+print(plot_hb_diagnostics(res_reg, trace_pars=c("bz[1,2]", "bz[2,2]","bz[2,4]", "phi")))
+print(plot_hb_forest(res_reg))
 
 print(">>> Analysis Complete.")
