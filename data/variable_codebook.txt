@@ -1,8 +1,6 @@
 ================================================================================
 DATA DICTIONARY / CODEBOOK
 Dataset: sumGDT.csv
-Project: Decoupling Decision and Intensity in Social Perception
-Author: Kuangzhe Xu
 ================================================================================
 
 Total Variables: 25
