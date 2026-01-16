@@ -1,7 +1,5 @@
 # Replication Materials: The BHHB Framework
 
-**Authors:** Kuangzhe Xu    
-**License:** MIT License   
 
 ## 📌 Overview
 
