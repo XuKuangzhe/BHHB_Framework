@@ -147,7 +147,7 @@ The raw eye-tracking data files (high-frequency coordinate logs) are **not inclu
 
 If you use this code or model in your research, please cite the following paper:
 
-> Xu, K. (Under Review). The BHHB Framework: Decoupling Decision and Intensity in Visual Attention. Behavior Research Methods.
+> 
 
 ## 📞 Contact
 
