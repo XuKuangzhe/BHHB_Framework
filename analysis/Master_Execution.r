@@ -1,7 +1,6 @@
 ################################################################################
-# Project: Decoupling Decision and Intensity in Visual Attention
+# Project: BHHB Framework
 # Script: Master Analysis Execution Pipeline
-# Author: Xu Kuangzhe
 # Date: 2026-01
 ################################################################################
 
