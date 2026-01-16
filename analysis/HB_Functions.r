@@ -3,7 +3,6 @@
 # Purpose: Comprehensive analysis pipeline including parameter recovery simulation, 
 #          empirical fitting, posterior predictive checks (PPC), model comparison 
 #          (CRPS/RMSE/MAE), and prior sensitivity analysis.
-# Author: Kuangzhe Xu
 # Date: 2026-01-09
 # ==============================================================================
 
