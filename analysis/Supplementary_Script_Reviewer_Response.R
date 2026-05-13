@@ -24,13 +24,13 @@ library(patchwork)
 
 # [IMPORTANT NOTE]: Ensure that the compiled Stan models (ZIBmodvef, LMMmod, BetaMod) 
 # and the main dataset (sumGDTs) are loaded into the global environment before execution.
-# LMMmod  <- stan_model("~/Jo/CSUC/PaperSubmition/2025/BRM/LMM_baseline.stan")
-# BetaMod <- stan_model("~/Jo/CSUC/PaperSubmition/2025/BRM/Beta_squeezed.stan")
+# LMMmod  <- stan_model("LMM_baseline.stan")
+# BetaMod <- stan_model("Beta_squeezed.stan")
 
 # ==============================================================================
 # MODULE 1 & 2 DATA PREP: Load raw data for sensitivity checks
 # ==============================================================================
-sumGDT_raw <- read_csv("~/Jo/Hirosaki Univ./2023Experment/data/sumGDT.csv", show_col_types = FALSE) %>%
+sumGDT_raw <- read_csv("/data/sumGDT.csv", show_col_types = FALSE) %>%
   mutate(
     infID = str_sub(picname, 1, 3),
     expName = str_sub(expName, 13, 15)
@@ -337,7 +337,7 @@ run_confidence_validation <- function(dataset, stan_model_obj, exp_list, aoi_lis
 # ==============================================================================
 print(">>> Preparing Data for Heatmaps...")
 
-plot_single_heatmap <- function(transdata, plot_title, bg_img_path = "~/Jo/そのた/joface2.jpg") {
+plot_single_heatmap <- function(transdata, plot_title, bg_img_path = "/joface2.jpg") {
   hitdata <- matrix(0, 558, 412)
   n.r <- nrow(transdata)
   for (i.r in n.r:1) {
@@ -369,7 +369,7 @@ plot_single_heatmap <- function(transdata, plot_title, bg_img_path = "~/Jo/そ�
   return(p)
 }
 
-plot_diff_heatmap <- function(transdata1, transdata2, plot_title, bg_img_path = "~/Jo/そのた/joface2.jpg") {
+plot_diff_heatmap <- function(transdata1, transdata2, plot_title, bg_img_path = "/joface2.jpg") {
   hitdata1 <- matrix(0, 558, 412); hitdata2 <- matrix(0, 558, 412)
   for (i.r in nrow(transdata1):1) {
     if(transdata1$ys[i.r] > 0 & transdata1$ys[i.r] <= 558 & transdata1$xs[i.r] > 0 & transdata1$xs[i.r] <= 412) 
