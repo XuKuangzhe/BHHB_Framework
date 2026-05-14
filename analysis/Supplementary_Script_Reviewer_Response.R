@@ -404,7 +404,7 @@ plot_diff_heatmap <- function(transdata1, transdata2, plot_title, bg_img_path = 
   return(p)
 }
 
-# (download the raw data from OSF)
+# (download the raw data from OSF: https://osf.io/9ejpg/files/osfstorage)
 # sumHMGL<-read_csv("data/sumHMGL.csv")
 # sumHMML<-read_csv("data/sumHMML.csv")
 # sumHMGLP <- sumHMGL %>% mutate(imgID=str_sub(picname,1,3))
