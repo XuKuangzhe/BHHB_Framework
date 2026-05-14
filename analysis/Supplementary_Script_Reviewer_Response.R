@@ -404,7 +404,17 @@ plot_diff_heatmap <- function(transdata1, transdata2, plot_title, bg_img_path = 
   return(p)
 }
 
-# (Assuming data trans_gaze and trans_mouse are extracted from user environment)
+# (download the raw data from OSF)
+# sumHMGL<-read_csv("data/sumHMGL.csv")
+# sumHMML<-read_csv("data/sumHMML.csv")
+# sumHMGLP <- sumHMGL %>% mutate(imgID=str_sub(picname,1,3))
+# sumHMMLP <- sumHMML %>% mutate(imgID=str_sub(picname,1,3))
+# target_exp <- "S12"
+# target_imp <- "Neu"
+# dat_gaze <- sumHMGLP %>% filter(str_detect(expName, target_exp), imgID == target_imp)
+# trans_gaze <- tibble(xs = dat_gaze$vX - 754, ys = dat_gaze$vY - 261)
+# dat_mouse <- sumHMMLP %>% filter(str_detect(expName, target_exp), imgID == target_imp)
+# trans_mouse <- tibble(xs = dat_mouse$vX - 754, ys = dat_mouse$vY - 261)
 # p_gaze <- plot_single_heatmap(trans_gaze, plot_title = "A. Gaze Fixation")
 # p_mouse <- plot_single_heatmap(trans_mouse, plot_title = "B. Mouse Tracking")
 # p_diff <- plot_diff_heatmap(trans_gaze, trans_mouse, plot_title = "C. Divergence (Gaze - Mouse)")
